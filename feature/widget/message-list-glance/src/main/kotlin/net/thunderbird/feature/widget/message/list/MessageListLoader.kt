@@ -50,10 +50,10 @@ internal class MessageListLoader(
 
         return if (config.showingThreadedList) {
             val (selection, selectionArgs) = buildSelection(config)
-            messageListRepository.getThreadedMessages(accountUuid, selection, selectionArgs, sortOrder, mapper)
+            messageListRepository.getThreadedMessages(accountUuid, selection, selectionArgs, sortOrder, -1, mapper)
         } else {
             val (selection, selectionArgs) = buildSelection(config)
-            messageListRepository.getMessages(accountUuid, selection, selectionArgs, sortOrder, mapper)
+            messageListRepository.getMessages(accountUuid, selection, selectionArgs, sortOrder, -1, mapper)
         }
     }
 

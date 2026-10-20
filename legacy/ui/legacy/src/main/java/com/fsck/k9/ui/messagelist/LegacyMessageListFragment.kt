@@ -214,6 +214,8 @@ class LegacyMessageListFragment :
 
     private lateinit var accountUuids: Array<String>
     private var accounts: List<LegacyAccount> = emptyList()
+    private var windowGrowth = 0
+    private var hasMoreLocalMessages = false
 
     private var account: LegacyAccount? = null
 
@@ -707,6 +709,7 @@ class LegacyMessageListFragment :
             sortDateAscending,
             activeMessage,
             legacyViewModel.messageSortOverrides.toMap(),
+            messageListLimit = computeMessageListWindow(),
         )
 
         if (forceUpdate) {
@@ -782,6 +785,12 @@ class LegacyMessageListFragment :
     }
 
     override fun onFooterClicked() {
+        if (hasMoreLocalMessages) {
+            windowGrowth += MESSAGE_LIST_PAGE_STEP
+            loadMessageList()
+            return
+        }
+
         val account = this.account ?: return
         val currentFolder = this.currentFolder ?: return
 
@@ -1398,11 +1407,13 @@ class LegacyMessageListFragment :
 
         val footerText = if (initialMessageListLoad) {
             null
-        } else if (localSearch.isManualSearch || currentFolder == null || account == null) {
+        } else if (localSearch.isManualSearch || currentFolder == null) {
             null
         } else if (currentFolder.loading) {
             getString(R.string.status_loading_more)
-        } else if (!currentFolder.moreMessages) {
+        } else if (hasMoreLocalMessages) {
+            getString(R.string.message_list_load_more_messages_action)
+        } else if (account == null || !currentFolder.moreMessages) {
             null
         } else if (account.displayCount == 0) {
             getString(R.string.message_list_load_more_messages_action)
@@ -2057,6 +2068,8 @@ class LegacyMessageListFragment :
 
         initialMessageListLoad = false
 
+        hasMoreLocalMessages = messageListInfo.hasMoreLocalMessages
+
         currentFolder?.let { currentFolder ->
             currentFolder.moreMessages = messageListInfo.hasMoreMessages
             updateFooterText()
@@ -2694,6 +2707,21 @@ class LegacyMessageListFragment :
         FolderNotFound(R.string.message_list_error_folder_not_found),
     }
 
+
+    private fun computeMessageListWindow(): Int {
+        if (isThreadDisplay || localSearch.isManualSearch) return -1
+        val base = if (isUnifiedFolders || account == null) {
+            accountManager.getAccounts().minOfOrNull { effectiveWindowFor(it) } ?: MESSAGE_LIST_DEFAULT_WINDOW
+        } else {
+            effectiveWindowFor(requireNotNull(account))
+        }
+        return base + windowGrowth
+    }
+
+    private fun effectiveWindowFor(forAccount: LegacyAccount): Int {
+        val displayCount = forAccount.displayCount
+        return if (displayCount > 0) maxOf(displayCount, MESSAGE_LIST_MIN_WINDOW) else MESSAGE_LIST_DEFAULT_WINDOW
+    }
     object Factory : MessageListFragmentBridgeContract.Factory {
         override fun newInstance(
             search: LocalMessageSearch,
@@ -2713,6 +2741,10 @@ class LegacyMessageListFragment :
     }
 
     companion object {
+        private const val MESSAGE_LIST_MIN_WINDOW = 50
+        private const val MESSAGE_LIST_DEFAULT_WINDOW = 100
+        private const val MESSAGE_LIST_PAGE_STEP = 100
+
         protected const val ARG_SEARCH = "searchObject"
         protected const val ARG_THREADED_LIST = "showingThreadedList"
         protected const val ARG_IS_THREAD_DISPLAY = "isThreadedDisplay"

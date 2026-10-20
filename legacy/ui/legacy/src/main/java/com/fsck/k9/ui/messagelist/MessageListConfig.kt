@@ -12,6 +12,8 @@ data class MessageListConfig(
     val sortDateAscending: Boolean,
     val activeMessage: MessageReference?,
     val sortOverrides: Map<MessageReference, MessageSortOverride>,
+    // Maximum number of list items to load into memory; -1 = unlimited. Bounds memory on huge folders.
+    val messageListLimit: Int = -1,
 )
 
 data class MessageSortOverride(

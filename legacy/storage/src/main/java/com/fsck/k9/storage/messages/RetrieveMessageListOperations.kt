@@ -15,8 +15,11 @@ internal class RetrieveMessageListOperations(private val lockableDatabase: Locka
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int = -1,
         mapper: MessageMapper<out T?>,
     ): List<T> {
+        val limitClause = if (limit >= 0) "\nLIMIT ?" else ""
+        val args = if (limit >= 0) selectionArgs + limit.toString() else selectionArgs
         return lockableDatabase.execute(false) { database ->
             database.rawQuery(
                 """
@@ -44,9 +47,9 @@ LEFT JOIN FOLDERS ON (folders.id = messages.folder_id)
 WHERE
   ($selection)
   AND empty = 0 AND deleted = 0
-ORDER BY $sortOrder
+ORDER BY $sortOrder$limitClause
                 """,
-                selectionArgs,
+                args,
             ).use { cursor ->
                 val cursorMessageAccessor = CursorMessageAccessor(cursor, includesThreadCount = false)
                 buildList {
@@ -65,6 +68,7 @@ ORDER BY $sortOrder
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int = -1,
         mapper: MessageMapper<out T?>,
     ): List<T> {
         val orderBy = SqlWhereClause.addPrefixToSelection(
@@ -72,6 +76,8 @@ ORDER BY $sortOrder
             "aggregated.",
             sortOrder,
         )
+        val limitClause = if (limit >= 0) "\nLIMIT ?" else ""
+        val args = if (limit >= 0) selectionArgs + limit.toString() else selectionArgs
 
         return lockableDatabase.execute(false) { database ->
             database.rawQuery(
@@ -128,9 +134,9 @@ JOIN messages ON (
 )
 JOIN folders ON (folders.id = messages.folder_id)
 GROUP BY threads.root
-ORDER BY $orderBy
+ORDER BY $orderBy$limitClause
                 """,
-                selectionArgs,
+                args,
             ).use { cursor ->
                 val cursorMessageAccessor = CursorMessageAccessor(cursor, includesThreadCount = true)
                 buildList {
@@ -141,6 +147,42 @@ ORDER BY $orderBy
                         }
                     }
                 }
+            }
+        }
+    }
+
+    fun getMessageCount(selection: String, selectionArgs: Array<String>): Int {
+        return lockableDatabase.execute(false) { database ->
+            database.rawQuery(
+                """
+SELECT COUNT(*)
+FROM messages
+JOIN threads ON (threads.message_id = messages.id)
+WHERE
+  ($selection)
+  AND empty = 0 AND deleted = 0
+                """,
+                selectionArgs,
+            ).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getInt(0) else 0
+            }
+        }
+    }
+
+    fun getThreadedMessageCount(selection: String, selectionArgs: Array<String>): Int {
+        return lockableDatabase.execute(false) { database ->
+            database.rawQuery(
+                """
+SELECT COUNT(DISTINCT threads.root)
+FROM messages
+JOIN threads ON (threads.message_id = messages.id)
+WHERE
+  ($selection)
+  AND messages.empty = 0 AND messages.deleted = 0
+                """,
+                selectionArgs,
+            ).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
         }
     }

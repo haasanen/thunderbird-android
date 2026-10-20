@@ -49,9 +49,10 @@ class MessageListLoader(
             }
             .sortedWith(config)
 
-        val hasMoreMessages = loadHasMoreMessages(accounts, config.search.folderIds)
+        val hasLocalMore = config.messageListLimit >= 0 && hasMoreMessagesThanWindow(accounts, config)
+        val hasMoreMessages = hasLocalMore || loadHasMoreMessages(accounts, config.search.folderIds)
 
-        return MessageListInfo(messageListItems, hasMoreMessages)
+        return MessageListInfo(messageListItems, hasMoreMessages, hasMoreLocalMessages = hasLocalMore)
     }
 
     private fun loadMessageListForAccount(account: LegacyAccount, config: MessageListConfig): List<MessageListItem> {
@@ -69,6 +70,14 @@ class MessageListLoader(
             },
         )
 
+        // When returning to a previously opened message, allow it to remain inside the loaded window
+        // even if it sits outside the display limit (e.g. account.displayCount == 0 / large folders).
+        val limit = when {
+            config.activeMessage?.accountUuid == account.uuid && config.messageListLimit >= 0 ->
+                (config.messageListLimit + 1) * 2 - 1
+            else -> config.messageListLimit
+        }
+
         return when {
             threadId != null -> {
                 messageListRepository.getThread(accountUuid, threadId, sortOrder, mapper)
@@ -76,14 +85,28 @@ class MessageListLoader(
 
             config.showingThreadedList -> {
                 val (selection, selectionArgs) = buildSelection(account, config)
-                messageListRepository.getThreadedMessages(accountUuid, selection, selectionArgs, sortOrder, mapper)
+                messageListRepository.getThreadedMessages(accountUuid, selection, selectionArgs, sortOrder, limit, mapper)
             }
 
             else -> {
                 val (selection, selectionArgs) = buildSelection(account, config)
-                messageListRepository.getMessages(accountUuid, selection, selectionArgs, sortOrder, mapper)
+                messageListRepository.getMessages(accountUuid, selection, selectionArgs, sortOrder, limit, mapper)
             }
         }
+    }
+
+    private fun hasMoreMessagesThanWindow(accounts: List<LegacyAccount>, config: MessageListConfig): Boolean {
+        val showingThreaded = config.showingThreadedList
+        for (account in accounts) {
+            val (selection, selectionArgs) = buildSelection(account, config)
+            val count = if (showingThreaded) {
+                messageListRepository.getThreadedMessageCount(account.uuid, selection, selectionArgs)
+            } else {
+                messageListRepository.getMessageCount(account.uuid, selection, selectionArgs)
+            }
+            if (count > config.messageListLimit) return true
+        }
+        return false
     }
 
     private fun buildSelection(account: LegacyAccount, config: MessageListConfig): Pair<String, Array<String>> {
@@ -225,4 +248,9 @@ private fun Comparator<MessageListItem>.thenByDate(config: MessageListConfig): C
     }
 }
 
-data class MessageListInfo(val messageListItems: List<MessageListItem>, val hasMoreMessages: Boolean)
+data class MessageListInfo(
+    val messageListItems: List<MessageListItem>,
+    val hasMoreMessages: Boolean,
+    // True when the local message list was cut off by the display window (see MessageListConfig.messageListLimit)
+    val hasMoreLocalMessages: Boolean = false,
+)

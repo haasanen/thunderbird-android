@@ -49,13 +49,24 @@ class DefaultMessageListRepository(
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int,
         messageMapper: MessageMapper<T>,
     ): List<T> {
         val messageStore = messageStoreManager.getMessageStore(accountUuid)
         val cache = MessageListCache.getCache(accountUuid)
 
         val mapper = if (cache.isEmpty()) messageMapper else CacheAwareMessageMapper(cache, messageMapper)
-        return messageStore.getMessages(selection, selectionArgs, sortOrder, mapper)
+        return messageStore.getMessages(selection, selectionArgs, sortOrder, limit, mapper)
+    }
+
+    override fun getMessageCount(accountUuid: String, selection: String, selectionArgs: Array<String>): Int {
+        val messageStore = messageStoreManager.getMessageStore(accountUuid)
+        return messageStore.getMessageCount(selection, selectionArgs)
+    }
+
+    override fun getThreadedMessageCount(accountUuid: String, selection: String, selectionArgs: Array<String>): Int {
+        val messageStore = messageStoreManager.getMessageStore(accountUuid)
+        return messageStore.getThreadedMessageCount(selection, selectionArgs)
     }
 
     /**
@@ -66,13 +77,14 @@ class DefaultMessageListRepository(
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int,
         messageMapper: MessageMapper<T>,
     ): List<T> {
         val messageStore = messageStoreManager.getMessageStore(accountUuid)
         val cache = MessageListCache.getCache(accountUuid)
 
         val mapper = if (cache.isEmpty()) messageMapper else CacheAwareMessageMapper(cache, messageMapper)
-        return messageStore.getThreadedMessages(selection, selectionArgs, sortOrder, mapper)
+        return messageStore.getThreadedMessages(selection, selectionArgs, sortOrder, limit, mapper)
     }
 
     /**

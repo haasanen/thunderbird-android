@@ -124,27 +124,39 @@ interface MessageStore {
     fun getAllMessagesAndEffectiveDates(folderId: Long): Map<String, Long?>
 
     /**
-     * Retrieve list of messages.
+     * Retrieve list of messages, optionally limited to the first [limit] rows (-1 = unlimited).
      */
     fun <T> getMessages(
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int = -1,
         messageMapper: MessageMapper<out T?>,
     ): List<T>
 
     /**
-     * Retrieve threaded list of messages.
+     * Retrieve threaded list of messages, optionally limited to the first [limit] rows (-1 = unlimited).
      */
     fun <T> getThreadedMessages(
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int = -1,
         messageMapper: MessageMapper<out T?>,
     ): List<T>
 
     /**
-     * Retrieve list of messages in a thread.
+     * Count non-empty, non-deleted messages matching the given selection.
+     */
+    fun getMessageCount(selection: String, selectionArgs: Array<String>): Int = Int.MAX_VALUE
+
+    /**
+     * Count distinct threads containing non-empty, non-deleted messages matching the given selection.
+     */
+    fun getThreadedMessageCount(selection: String, selectionArgs: Array<String>): Int = Int.MAX_VALUE
+
+    /**
+     * Retrieve list of messages in a thread from [MessageStore].
      */
     fun <T> getThread(threadId: Long, sortOrder: String, messageMapper: MessageMapper<out T?>): List<T>
 

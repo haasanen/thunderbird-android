@@ -360,8 +360,8 @@ class MessageListRepositoryTest {
 
     private fun addMessages(vararg messages: MessageData) {
         messageStore.stub {
-            on { getMessages<Any>(eq(SELECTION), eq(SELECTION_ARGS), eq(SORT_ORDER), any()) } doAnswer {
-                val mapper: MessageMapper<Any?> = it.getArgument(3)
+            on { getMessages<Any>(eq(SELECTION), eq(SELECTION_ARGS), eq(SORT_ORDER), eq(-1), any()) } doAnswer {
+                val mapper: MessageMapper<Any?> = it.getArgument(4)
 
                 runMessageMapper(messages, mapper)
             }
@@ -370,8 +370,8 @@ class MessageListRepositoryTest {
 
     private fun addThreadedMessages(vararg messages: MessageData) {
         messageStore.stub {
-            on { getThreadedMessages<Any>(eq(SELECTION), eq(SELECTION_ARGS), eq(SORT_ORDER), any()) } doAnswer {
-                val mapper: MessageMapper<Any?> = it.getArgument(3)
+            on { getThreadedMessages<Any>(eq(SELECTION), eq(SELECTION_ARGS), eq(SORT_ORDER), eq(-1), any()) } doAnswer {
+                val mapper: MessageMapper<Any?> = it.getArgument(4)
 
                 runMessageMapper(messages, mapper)
             }

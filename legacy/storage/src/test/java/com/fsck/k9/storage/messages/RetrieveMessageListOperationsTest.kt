@@ -6,6 +6,7 @@ import app.k9mail.legacy.message.extractors.PreviewResult.PreviewType
 import assertk.assertThat
 import assertk.assertions.containsExactly
 import assertk.assertions.isEmpty
+import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isTrue
@@ -494,12 +495,126 @@ class RetrieveMessageListOperationsTest : RobolectricTest() {
         assertThat(result).containsExactly(messageId2, messageId3)
     }
 
+    @Test
+    fun `getMessages() with limit should return only the first N messages`() {
+        val folderId = sqliteDatabase.createFolder()
+        for (i in 1..5) {
+            val messageId = sqliteDatabase.createMessage(folderId, uid = "uid$i", date = 1000L + i)
+            sqliteDatabase.createThread(messageId)
+        }
+
+        val result = retrieveMessageListOperations.getMessages(
+            selection = "folder_id = ?",
+            selectionArgs = arrayOf(folderId.toString()),
+            sortOrder = "date DESC, id DESC",
+            limit = 3,
+            mapper = { it.id },
+        )
+
+        // newest three by date: uid5, uid4, uid3
+        assertThat(result).hasSize(3)
+        assertThat(result.first()).isEqualTo(result[0])
+        val all = retrieveMessageListOperations.getMessages(
+            selection = "folder_id = ?",
+            selectionArgs = arrayOf(folderId.toString()),
+            sortOrder = "date DESC, id DESC",
+            mapper = { it.id },
+        )
+        assertThat(result).isEqualTo(all.take(3))
+    }
+
+    @Test
+    fun `getMessages() with limit larger than result set should return all messages`() {
+        val folderId = sqliteDatabase.createFolder()
+        val messageId = sqliteDatabase.createMessage(folderId, uid = "uid1")
+        sqliteDatabase.createThread(messageId)
+
+        val result = retrieveMessageListOperations.getMessages(
+            selection = "folder_id = ?",
+            selectionArgs = arrayOf(folderId.toString()),
+            sortOrder = "date DESC, id DESC",
+            limit = 10,
+            mapper = { it.id },
+        )
+
+        assertThat(result).containsExactly(messageId)
+    }
+
+    @Test
+    fun `getThreadedMessages() with limit should return only the first N threads`() {
+        val folderId = sqliteDatabase.createFolder()
+        for (i in 1..4) {
+            val messageId = sqliteDatabase.createMessage(folderId, uid = "uid$i", date = 1000L + i)
+            sqliteDatabase.createThread(messageId)
+        }
+
+        val result = retrieveMessageListOperations.getThreadedMessages(
+            selection = "folder_id = ?",
+            selectionArgs = arrayOf(folderId.toString()),
+            sortOrder = "aggregated.date DESC, id DESC",
+            limit = 2,
+            mapper = { it.id },
+        )
+
+        assertThat(result).hasSize(2)
+    }
+
+    @Test
+    fun `getMessageCount() should return number of non-deleted messages`() {
+        val folderId = sqliteDatabase.createFolder()
+        val messageId1 = sqliteDatabase.createMessage(folderId, uid = "uid1")
+        sqliteDatabase.createThread(messageId1)
+        val messageId2 = sqliteDatabase.createMessage(folderId, uid = "uid2")
+        sqliteDatabase.createThread(messageId2)
+        val messageId3 = sqliteDatabase.createMessage(folderId, uid = "uid3", deleted = true)
+        sqliteDatabase.createThread(messageId3)
+        val messageId4 = sqliteDatabase.createMessage(folderId, uid = "uid4", empty = true)
+        sqliteDatabase.createThread(messageId4)
+
+        val result = retrieveMessageListOperations.getMessageCount(
+            selection = "folder_id = ?",
+            selectionArgs = arrayOf(folderId.toString()),
+        )
+
+        assertThat(result).isEqualTo(2)
+    }
+
+    @Test
+    fun `getThreadedMessageCount() should count distinct threads`() {
+        val folderId = sqliteDatabase.createFolder()
+        val messageId1 = sqliteDatabase.createMessage(folderId, uid = "uid1")
+        val threadId = sqliteDatabase.createThread(messageId1)
+        val messageId2 = sqliteDatabase.createMessage(folderId, uid = "uid2")
+        sqliteDatabase.createThread(messageId2, root = threadId)
+        val messageId3 = sqliteDatabase.createMessage(folderId, uid = "uid3")
+        sqliteDatabase.createThread(messageId3)
+
+        val result = retrieveMessageListOperations.getThreadedMessageCount(
+            selection = "folder_id = ?",
+            selectionArgs = arrayOf(folderId.toString()),
+        )
+
+        assertThat(result).isEqualTo(2)
+    }
+
+    @Test
+    fun `getMessageCount() on empty folder should return zero`() {
+        val folderId = sqliteDatabase.createFolder()
+
+        val result = retrieveMessageListOperations.getMessageCount(
+            selection = "folder_id = ?",
+            selectionArgs = arrayOf(folderId.toString()),
+        )
+
+        assertThat(result).isEqualTo(0)
+    }
+
     private fun <T> getMessagesFromFolder(folderId: Long, mapper: MessageMapper<T?>): List<T> {
         return retrieveMessageListOperations.getMessages(
             selection = "folder_id = ?",
             selectionArgs = arrayOf(folderId.toString()),
             sortOrder = "date DESC, id DESC",
-            mapper,
+            mapper = mapper,
         )
     }
 
@@ -508,7 +623,7 @@ class RetrieveMessageListOperationsTest : RobolectricTest() {
             selection = "folder_id = ?",
             selectionArgs = arrayOf(folderId.toString()),
             sortOrder = "date DESC, id DESC",
-            mapper,
+            mapper = mapper,
         )
     }
 }

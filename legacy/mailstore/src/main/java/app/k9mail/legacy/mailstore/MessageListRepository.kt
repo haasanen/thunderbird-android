@@ -11,6 +11,7 @@ interface MessageListRepository {
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int = -1,
         messageMapper: MessageMapper<T>,
     ): List<T>
 
@@ -19,8 +20,13 @@ interface MessageListRepository {
         selection: String,
         selectionArgs: Array<String>,
         sortOrder: String,
+        limit: Int = -1,
         messageMapper: MessageMapper<T>,
     ): List<T>
+
+    fun getMessageCount(accountUuid: String, selection: String, selectionArgs: Array<String>): Int
+
+    fun getThreadedMessageCount(accountUuid: String, selection: String, selectionArgs: Array<String>): Int
 
     fun <T> getThread(
         accountUuid: String,
