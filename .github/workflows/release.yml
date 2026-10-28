@@ -102,7 +102,7 @@ jobs:
           } > .signing/k9.release.signing.properties
 
       - name: Unit tests (FOSS K-9 app graph)
-        run: ./gradlew --no-daemon :app-k9mail:testFossReleaseUnitTest
+        run: ./gradlew --no-daemon :app-k9mail:testFossDebugUnitTest
 
       - name: Assemble FOSS release
         run: ./gradlew --no-daemon :app-k9mail:assembleFossRelease -Pci=true
