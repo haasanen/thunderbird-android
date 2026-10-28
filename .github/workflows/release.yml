@@ -1,0 +1,144 @@
+name: Release
+
+# Fork release lane (haasanen convention): pushing a tag v<upstream>-h<N>
+# (e.g. v24.0-h2) builds the FOSS K-9 APK with the fork release key,
+# verifies the artifact by bytes, publishes it as a GitHub release asset
+# k9mail-<upstream>-h<N>.apk, and notifies the F-Droid delivery repo.
+# workflow_dispatch = build+verify only (no publish), for CI validation.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Fork versionCode scheme: 39100 + N from the -h<N> tag suffix.
+  # Must stay strictly above the hand-built v24.0-h1 APK (versionCode
+  # 39046, built locally before this lane existed) and below anything a
+  # future upstream rebase would use; revisit the base when rebasing the
+  # fork onto a newer K9MAIL_ tag.
+  VC_BASE: '39100'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: k9-${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: k9-${{ runner.os }}-gradle-
+
+      # Pin packages: the action's default includes the removed legacy
+      # 'tools' package and then fails when Google drops a default.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Guard tag format and stamp fork version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG="$(git rev-parse --abbrev-ref HEAD)"
+            echo "dispatch build on branch $TAG: using synthetic version (no publish)"
+            HN="h0"
+            N=0
+          elif [[ ! "$TAG" =~ ^v([0-9.]+)-h([0-9]+)$ ]]; then
+            echo "tag $TAG does not match v<upstream>-h<N> (fork naming rule); refusing"
+            exit 1
+          else
+            HN="h${BASH_REMATCH[2]}"
+            N="${BASH_REMATCH[2]}"
+          fi
+          VN="${TAG#v}"
+          VC=$((VC_BASE + N))
+          if [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]; then VN="$VN-$HN-dispatch"; VC=$((VC_BASE + 900)); fi
+          if [ "$VC" -le 39046 ]; then echo "versionCode $VC <= hand-built h1 (39046); refusing"; exit 1; fi
+          sed -E -i "s/^([[:space:]]*)versionCode = [0-9]+$/\1versionCode = $VC/" app-k9mail/build.gradle.kts
+          sed -E -i 's/^([[:space:]]*)versionName = "[^"]*"$/\1versionName = "'"$VN"'"/' app-k9mail/build.gradle.kts
+          grep -nE 'versionCode = |versionName = ' app-k9mail/build.gradle.kts | head -2
+          grep -q "versionCode = $VC" app-k9mail/build.gradle.kts || { echo "versionCode stamp failed"; exit 1; }
+          grep -q "versionName = \"$VN\"" app-k9mail/build.gradle.kts || { echo "versionName stamp failed"; exit 1; }
+          echo "VN=$VN" >> "$GITHUB_ENV"
+          echo "VC=$VC" >> "$GITHUB_ENV"
+          echo "ASSET=k9mail-$VN.apk" >> "$GITHUB_ENV"
+
+      - name: Restore signing
+        env:
+          K9_KEYSTORE_BASE64: ${{ secrets.K9_KEYSTORE_BASE64 }}
+          K9_STORE_PASS: ${{ secrets.K9_STORE_PASS }}
+          K9_KEY_ALIAS: ${{ secrets.K9_KEY_ALIAS }}
+          K9_KEY_PASS: ${{ secrets.K9_KEY_PASS }}
+        run: |
+          set -eu
+          if [ -z "${K9_KEYSTORE_BASE64:-}" ] || [ -z "${K9_STORE_PASS:-}" ] || [ -z "${K9_KEY_ALIAS:-}" ] || [ -z "${K9_KEY_PASS:-}" ]; then
+            echo "missing one of K9_KEYSTORE_BASE64 / K9_STORE_PASS / K9_KEY_ALIAS / K9_KEY_PASS secrets"; exit 1
+          fi
+          mkdir -p .signing
+          printf '%s' "$K9_KEYSTORE_BASE64" | base64 -d > .signing/k9-fork.keystore
+          {
+            printf 'k9.release.storeFile=%s/.signing/k9-fork.keystore\n' "$GITHUB_WORKSPACE"
+            printf 'k9.release.storePassword=%s\n' "$K9_STORE_PASS"
+            printf 'k9.release.keyAlias=%s\n' "$K9_KEY_ALIAS"
+            printf 'k9.release.keyPassword=%s\n' "$K9_KEY_PASS"
+          } > .signing/k9.release.signing.properties
+
+      - name: Unit tests (FOSS K-9 app graph)
+        run: ./gradlew --no-daemon :app-k9mail:testFossReleaseUnitTest
+
+      - name: Assemble FOSS release
+        run: ./gradlew --no-daemon :app-k9mail:assembleFossRelease -Pci=true
+
+      - name: Verify artifact (package, stamped versions, fork signer)
+        run: |
+          set -eu
+          APK="app-k9mail/build/outputs/apk/foss/release/app-k9mail-foss-release.apk"
+          test -f "$APK" || { echo "APK not produced"; find app-k9mail/build/outputs -name '*.apk'; exit 1; }
+          BADGE="$(aapt2 dump badging "$APK")"
+          echo "$BADGE" | grep -q "package: name='com.fsck.k9' versionCode='$VC' versionName='$VN'" || {
+            echo "manifest mismatch:"; echo "$BADGE" | grep '^package:'; exit 1; }
+          SIG="$(apksigner verify --print-certs "$APK" 2>/dev/null | grep 'certificate SHA-256 digest')"
+          # CN=K-9 Fork release key; a mismatch means we signed with the wrong key.
+          echo "$SIG" | grep -q '48fa9d74cba6f07d313b01db18c9c38d5077e197a3cf5f572b31b004d1da4d5d' || {
+            echo "unexpected signer: $SIG"; exit 1; }
+          cp "$APK" "$ASSET"
+          echo "artifact verified: $ASSET (vc=$VC vn=$VN)"
+
+      - name: Publish GitHub release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release create "$GITHUB_REF_NAME" --title "K-9 Mail $VN" --notes "Automated fork release (tag $GITHUB_REF_NAME). Browse: F-Droid repo https://haasanen.github.io/fdroid-repo/repo" "$ASSET"
+
+      - name: Notify F-Droid repo (push trigger, fail open)
+        if: github.event_name == 'push'
+        env:
+          FDROID_TOKEN: ${{ secrets.FDROID_DISPATCH_TOKEN }}
+        run: |
+          [ -z "${FDROID_TOKEN:-}" ] && { echo "no dispatch token, skipping"; exit 0; }
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $FDROID_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"ref":"main"}' \
+            https://api.github.com/repos/haasanen/fdroid-repo/actions/workflows/update.yml/dispatches \
+            || echo "dispatch failed (weekly cron is the safety net)"
