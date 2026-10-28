@@ -112,10 +112,13 @@ jobs:
           set -eu
           APK="app-k9mail/build/outputs/apk/foss/release/app-k9mail-foss-release.apk"
           test -f "$APK" || { echo "APK not produced"; find app-k9mail/build/outputs -name '*.apk'; exit 1; }
-          BADGE="$(aapt2 dump badging "$APK")"
+          # aapt2/apksigner are not on PATH on GH runners; resolve from SDK build-tools.
+          AAPT2="$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)"
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          BADGE="$("$AAPT2" dump badging "$APK")"
           echo "$BADGE" | grep -q "package: name='com.fsck.k9' versionCode='$VC' versionName='$VN'" || {
             echo "manifest mismatch:"; echo "$BADGE" | grep '^package:'; exit 1; }
-          SIG="$(apksigner verify --print-certs "$APK" 2>/dev/null | grep 'certificate SHA-256 digest')"
+          SIG="$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null | grep 'certificate SHA-256 digest')"
           # CN=K-9 Fork release key; a mismatch means we signed with the wrong key.
           echo "$SIG" | grep -q '48fa9d74cba6f07d313b01db18c9c38d5077e197a3cf5f572b31b004d1da4d5d' || {
             echo "unexpected signer: $SIG"; exit 1; }
