@@ -158,9 +158,10 @@ ORDER BY $orderBy$limitClause
 SELECT COUNT(*)
 FROM messages
 JOIN threads ON (threads.message_id = messages.id)
+LEFT JOIN folders ON (folders.id = messages.folder_id)
 WHERE
   ($selection)
-  AND empty = 0 AND deleted = 0
+  AND messages.empty = 0 AND messages.deleted = 0
                 """,
                 selectionArgs,
             ).use { cursor ->
@@ -176,6 +177,7 @@ WHERE
 SELECT COUNT(DISTINCT threads.root)
 FROM messages
 JOIN threads ON (threads.message_id = messages.id)
+LEFT JOIN folders ON (folders.id = messages.folder_id)
 WHERE
   ($selection)
   AND messages.empty = 0 AND messages.deleted = 0

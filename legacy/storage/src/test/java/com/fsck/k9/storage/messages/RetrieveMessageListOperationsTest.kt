@@ -609,6 +609,46 @@ class RetrieveMessageListOperationsTest : RobolectricTest() {
         assertThat(result).isEqualTo(0)
     }
 
+    @Test
+    fun `getMessageCount() with unified inbox selection on folders integrate column`() {
+        val unifiedFolderId = sqliteDatabase.createFolder(integrate = true)
+        val excludedFolderId = sqliteDatabase.createFolder(integrate = false)
+
+        val messageId1 = sqliteDatabase.createMessage(unifiedFolderId, uid = "uid1")
+        sqliteDatabase.createThread(messageId1)
+        val messageId2 = sqliteDatabase.createMessage(unifiedFolderId, uid = "uid2", deleted = true)
+        sqliteDatabase.createThread(messageId2)
+        val messageId3 = sqliteDatabase.createMessage(excludedFolderId, uid = "uid3")
+        sqliteDatabase.createThread(messageId3)
+
+        val result = retrieveMessageListOperations.getMessageCount(
+            selection = "integrate = ?",
+            selectionArgs = arrayOf("1"),
+        )
+
+        assertThat(result).isEqualTo(1)
+    }
+
+    @Test
+    fun `getThreadedMessageCount() with unified inbox selection on folders integrate column`() {
+        val unifiedFolderId = sqliteDatabase.createFolder(integrate = true)
+        val excludedFolderId = sqliteDatabase.createFolder(integrate = false)
+
+        val messageId1 = sqliteDatabase.createMessage(unifiedFolderId, uid = "uid1")
+        val threadId = sqliteDatabase.createThread(messageId1)
+        val messageId2 = sqliteDatabase.createMessage(unifiedFolderId, uid = "uid2")
+        sqliteDatabase.createThread(messageId2, root = threadId)
+        val messageId3 = sqliteDatabase.createMessage(excludedFolderId, uid = "uid3")
+        sqliteDatabase.createThread(messageId3)
+
+        val result = retrieveMessageListOperations.getThreadedMessageCount(
+            selection = "integrate = ?",
+            selectionArgs = arrayOf("1"),
+        )
+
+        assertThat(result).isEqualTo(1)
+    }
+
     private fun <T> getMessagesFromFolder(folderId: Long, mapper: MessageMapper<T?>): List<T> {
         return retrieveMessageListOperations.getMessages(
             selection = "folder_id = ?",
