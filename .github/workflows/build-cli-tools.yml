@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Build CLI tools
         run: ./gradlew buildCliTools

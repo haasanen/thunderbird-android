@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Quality - Spotless
         run: ./gradlew spotlessCheck
@@ -53,7 +53,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Quality - Detekt
         run: ./gradlew detekt
@@ -79,7 +79,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Quality - Dependency guard
         run: ./gradlew dependencyGuard
@@ -96,7 +96,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Quality - Konsist
         run: ./gradlew :quality:konsist:test

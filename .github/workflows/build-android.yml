@@ -36,13 +36,13 @@ jobs:
           fetch-depth: 1
 
       - name: Show disk usage
-        uses: ./.github/actions/disk-usage
+        uses: $/.github/actions/disk-usage
 
       - name: Cleanup disk
-        uses: ./.github/actions/disk-cleanup
+        uses: $/.github/actions/disk-cleanup
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
         with:
           write-cache: ${{ github.ref == 'refs/heads/main' }}
 
@@ -53,7 +53,7 @@ jobs:
         run: ./gradlew :app-common:assemble
 
       - name: Show disk usage
-        uses: ./.github/actions/disk-usage
+        uses: $/.github/actions/disk-usage
 
   build-k9:
     name: Build - K9 application
@@ -67,7 +67,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Build K9 application
         run: ./gradlew :app-k9mail:assemble -Pci=true
@@ -84,7 +84,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Check K9 Badging
         run: |
@@ -105,7 +105,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Build Thunderbird application
         run: ./gradlew :app-thunderbird:assemble -Pci=true
@@ -122,7 +122,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Check Thunderbird Badging
         run: |
@@ -147,7 +147,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Build App UI-catalog application in Debug mode
         run: ./gradlew -p components :ui:catalog:assembleDebug
@@ -164,7 +164,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Running unit tests
         run: ./gradlew testsOnCi --parallel
@@ -181,7 +181,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Running Android lint
         run: ./gradlew lint

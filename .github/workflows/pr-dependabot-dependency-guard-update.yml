@@ -46,7 +46,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token || github.token }}
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
 
       - name: Update dependency guard
         run: ./gradlew dependencyGuardBaseline

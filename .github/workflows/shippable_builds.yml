@@ -229,7 +229,7 @@ jobs:
 
       - name: Setup Gradle environment
         if: ${{ contains(matrix.releaseTarget, 'github') || needs.dump_config.outputs.releaseType == 'daily' }}
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
         with:
           disable-cache: "${{ contains(fromJSON('[\"beta\", \"release\"]'), needs.dump_config.outputs.releaseType) }}"
           add-job-summary: never
@@ -520,7 +520,7 @@ jobs:
           ref: ${{ steps.sha.outputs.app_sha }}
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
         with:
           disable-cache: "${{ contains(fromJSON('[\"beta\", \"release\"]'), needs.dump_config.outputs.releaseType) }}"
           add-job-summary: on-failure

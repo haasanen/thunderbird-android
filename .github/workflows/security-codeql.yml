@@ -38,7 +38,7 @@ jobs:
 
       - name: Setup Gradle environment
         if: matrix.language == 'java-kotlin'
-        uses: ./.github/actions/setup-gradle
+        uses: $/.github/actions/setup-gradle
         with:
           add-job-summary: 'never'
           disable-cache: 'true'
